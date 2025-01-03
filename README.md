@@ -5,6 +5,10 @@ the workflow is in the file Test.json
 
 you have to upload it into langflow
 
+prerequisite:
+- ollama service
+- traefik service (has to be removed)
+
 ```
 docker compose up --build
 ```
