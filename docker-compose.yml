@@ -1,19 +1,42 @@
+
+
+networks:
+  # réseau utilisé par Traefik pour router les requêtes vers les service exposés à l'exterieur
+  traefik_network:
+    external: true
+
 services:
   database:
     image: nouchka/sqlite3:latest
+    container_name: sqlite2
     stdin_open: true
     tty: true
+    networks:
+      traefik_network:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.sqlite2.rule=Host(`sqlite2.dev.localhost`)
+      - traefik.http.routers.sqlite2.tls=true
+      - traefik.http.services.sqlite2.loadbalancer.server.port=1433
     volumes:
       - sqlite-data:/root/db/
 
   postgres:
     image: postgres:16
+    container_name: postgres2
     environment:
       POSTGRES_USER: langflow
       POSTGRES_PASSWORD: langflow
       POSTGRES_DB: langflow
     ports:
       - 5432:5432
+    networks:
+      traefik_network:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.postgres2.rule=Host(`postgres2.dev.localhost`)
+      - traefik.http.routers.postgres2.tls=true
+      - traefik.http.services.postgres2.loadbalancer.server.port=5432
     volumes:
       - postgres-langflow:/var/lib/postgresql/data
 
@@ -22,14 +45,22 @@ services:
     image: langflowai/langflow:latest
     ports:
       - 7860:7860
+    networks:
+      traefik_network:
     environment:
-      - LANGFLOW_DATABASE_URL=postgresql://langflow:langflow@postgres:5432/langflow
+      - LANGFLOW_DATABASE_URL=postgresql://langflow:langflow@postgres2:5432/langflow
     depends_on:
       - database
     volumes:
       - langflow-data:/app/langflow
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.langflow2.rule=Host(`langflow2.dev.localhost`)
+      - traefik.http.routers.langflow2.tls=true
+      - traefik.http.services.langflow2.loadbalancer.server.port=7860
 
   pocgradio:
+    container_name: pocgradio2
     build:
       context: ./
       dockerfile: Dockerfile
@@ -41,6 +72,13 @@ services:
       - GRADIO_SERVER_PORT=7870
     ports:
       - 7870:7870
+    networks:
+      traefik_network:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.pocgradio2.rule=Host(`pocgradio2.dev.localhost`)
+      - traefik.http.routers.pocgradio2.tls=true
+      - traefik.http.services.pocgradio2.loadbalancer.server.port=7870
 
   
 volumes:
