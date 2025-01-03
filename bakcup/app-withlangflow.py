@@ -3,26 +3,20 @@ import requests
 import json
 import warnings
 import logging
-from pathlib import Path
-
-import httpx
-# try:
-#     from langflow.load import upload_file
-# except ImportError:
-#     warnings.warn("Langflow provides a function to help you upload files to the flow. Please install langflow to use it.")
-#     upload_file = None
 
 # Configuration de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
+try:
+    from langflow.load import upload_file
+except ImportError:
+    warnings.warn("Langflow provides a function to help you upload files to the flow. Please install langflow to use it.")
+    upload_file = None
 
 # Configuration de base
 API_KEY = "sk-LxnvoTxVgyHpFTPl_2Uzds4OafRt50MUsJiGduB_HOw"  # Remplacez par votre clé API Langflow
-#BASE_API_URL = "https://langflow2.dev.localhost/"
-BASE_API_URL = "http://langflow2:7860"
-FLOW_ID = "4f190944-89fc-4d92-9a0d-0d5f9a9d7e7e"
+BASE_API_URL = "https://langflow2.dev.localhost/"
 ENDPOINT = "qaflow"  # Nom de l'endpoint
 TWEAKS = {
   "ChatInput-9TNL9": {
@@ -82,71 +76,13 @@ TWEAKS = {
   }
 }
 
-
-class UploadError(Exception):
-    """Raised when an error occurs during the upload process."""
-
-
-def upload(file_path: str, host: str, flow_id: str):
-    """Upload a file to Langflow and return the file path."""
-    url = f"{host}/api/v1/upload/{flow_id}"
-    try:
-        with Path(file_path).open("rb") as file:
-            logger.info(f"Tentative d'upload du fichier : {file_path} vers {url}")
-            response = httpx.post(url, files={"file": file}, timeout=10)
-            logger.info(f"Statut de la réponse : {response.status_code}")
-            if response.status_code in {httpx.codes.OK, httpx.codes.CREATED}:
-                logger.info(f"Réponse : {response.json()}")
-                return response.json()
-            else:
-                logger.error(f"Erreur API : {response.status_code} - {response.text}")
-    except Exception as e:
-        logger.error(f"Exception lors de l'upload : {e}")
-        raise UploadError(f"Error uploading file: {e}")
-    raise UploadError(f"Error uploading file: {response.status_code}")
-
-
-def upload_file(file_path: str, host: str, flow_id: str, components: list[str], tweaks: dict | None = None):
-    """Upload a file to Langflow and return the file path.
-
-    Args:
-        file_path (str): The path to the file to be uploaded.
-        host (str): The host URL of Langflow.
-        port (int): The port number of Langflow.
-        flow_id (UUID): The ID of the flow to which the file belongs.
-        components (str): List of component IDs or names that need the file.
-        tweaks (dict): A dictionary of tweaks to be applied to the file.
-
-    Returns:
-        dict: A dictionary containing the file path and any tweaks that were applied.
-
-    Raises:
-        UploadError: If an error occurs during the upload process.
-    """
-    try:
-        response = upload(file_path, host, flow_id)
-    except Exception as e:
-        msg = f"Error uploading file: {e}"
-        raise UploadError(msg) from e
-
-    if not tweaks:
-        tweaks = {}
-    if response["file_path"]:
-        for component in components:
-            if isinstance(component, str):
-                tweaks[component] = {"path": response["file_path"]}
-            else:
-                msg = f"Error uploading file: component ID or name must be a string. Got {type(component)}"
-                raise UploadError(msg)
-        return tweaks
-
-    msg = "Error uploading file"
-    raise UploadError(msg)
-
 def run_flow(file):
     """
     Fonction pour exécuter un workflow Langflow à partir d'un fichier donné.
-    """    
+    """
+    if not upload_file:
+        return "Langflow n'est pas installé. Veuillez l'installer pour utiliser cette fonctionnalité."
+
     logger.info("ici")
     if file is not None:
         try:
@@ -154,7 +90,7 @@ def run_flow(file):
             tweaks = upload_file(
                 file_path=file.name,
                 host=BASE_API_URL,
-                flow_id=FLOW_ID,
+                flow_id=ENDPOINT,
                 components=["File-ryvgU"],
                 tweaks=TWEAKS
             )
@@ -167,11 +103,16 @@ def run_flow(file):
     api_url = f"{BASE_API_URL}/api/v1/run/{ENDPOINT}"
     
     payload = {
-        #"input_value": "",  # La valeur d'entrée sera définie par le fichier uploadé
+        "input_value": "",  # La valeur d'entrée sera définie par le fichier uploadé
         "output_type": "chat",
         "input_type": "chat",
         "tweaks": tweaks
     }
+    
+    # "input_value": inputs.get("ChatInput-lbGcg", ""),
+    #     "output_type": "chat",
+    #     "input_type": "chat",
+    #     "tweaks": TWEAKS
 
     headers = {"x-api-key": API_KEY}
     logger.info("go2")
