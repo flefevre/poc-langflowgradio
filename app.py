@@ -82,6 +82,31 @@ TWEAKS = {
   }
 }
 
+def extract_messages_by_component_ids(json_data, component_ids):
+    """
+    Extrait les valeurs de l'attribut 'message' pour une liste de component_id donnée.
+
+    Args:
+        json_data (dict): Le JSON des données.
+        component_ids (list): La liste des component_id à rechercher.
+
+    Returns:
+        dict: Un dictionnaire avec chaque component_id trouvé comme clé et le message correspondant comme valeur.
+              Si un component_id n'est pas trouvé, sa valeur sera None.
+    """ 
+    bresults = {component_id: None for component_id in component_ids}  # Initialisation du dictionnaire des résultats
+
+    # Parcourir les données JSON
+    for output in json_data.get("outputs", []):
+        for result in output.get("outputs", []):
+            # Vérifier si le component_id correspond
+            component_id = result.get("component_id")
+            if component_id in component_ids:
+                # Récupérer le message correspondant
+                for message_data in result.get("messages", []):
+                    bresults[component_id] = message_data.get("message")
+    
+    return bresults
 
 class UploadError(Exception):
     """Raised when an error occurs during the upload process."""
@@ -147,7 +172,6 @@ def run_flow(file):
     """
     Fonction pour exécuter un workflow Langflow à partir d'un fichier donné.
     """    
-    logger.info("ici")
     if file is not None:
         try:
             logger.info("before la")
@@ -158,12 +182,10 @@ def run_flow(file):
                 components=["File-ryvgU"],
                 tweaks=TWEAKS
             )
-            logger.info("la")
         except Exception as e:
             return f"Erreur lors du téléchargement du fichier : {e}"
     else:
         return "Veuillez fournir un fichier."
-    logger.info("go")
     api_url = f"{BASE_API_URL}/api/v1/run/{ENDPOINT}"
     
     payload = {
@@ -174,32 +196,34 @@ def run_flow(file):
     }
 
     headers = {"x-api-key": API_KEY}
-    logger.info("go2")
     try:
         response = requests.post(api_url, json=payload, headers=headers)
-        logger.info("go3")
         if response.status_code != 200:
             return f"Erreur API : {response.status_code} - {response.text}"
 
         response_json = response.json()
-
-        # Retourner une réponse formatée
-        return json.dumps(response_json, indent=4, ensure_ascii=False)
+        #logger.info(json.dumps(response_json, indent=4, ensure_ascii=False))
+        
+        #"TextOutput-T0rBI", "TextOutput-akHaI", "TextOutput-H2BGi", 
+        component_ids = ["TextOutput-VMHD2"]
+        outputs = extract_messages_by_component_ids(response_json, component_ids)
+        
+        return outputs["TextOutput-VMHD2"]
 
     except requests.exceptions.RequestException as e:
         return f"Erreur lors de la requête : {e}"
 
 # Interface Gradio
 with gr.Blocks() as interface:
-    gr.Markdown("### Interface Langflow avec Gradio")
+    gr.Markdown("### Resume Service IA ")
 
     with gr.Row():
-        inputfile = gr.File(label="Fichier à envoyer", type="filepath")
+        inputfile = gr.File(label="File to upload", type="filepath")
 
     with gr.Row():
-        output_text_1 = gr.Textbox(label="Résultat", lines=10, interactive=False)
+        output_text_1 = gr.Textbox(label="Resume", lines=10, interactive=False, show_label=True, show_copy_button=True)
 
-    send_button = gr.Button("Envoyer")
+    send_button = gr.Button("Send")
     send_button.click(fn=run_flow, inputs=[inputfile], outputs=[output_text_1])
 
 # Lancer Gradio
